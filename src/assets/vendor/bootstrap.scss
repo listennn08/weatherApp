@@ -1,0 +1,38 @@
+.nav.nav-tabs {
+  .nav-link{
+    color: #000;
+    padding-left: 5.6rem;
+    padding-right: 5.6rem;
+    border-bottom: 2px solid #58A1AD;
+    position: relative;
+    overflow: hidden;
+
+    &.active {
+      color: #fff;
+      background-color:  #58A1AD;
+
+      &:hover::before {
+        animation: diffusion .5s ease-in-out;
+      }
+    }
+
+    &:hover {
+      color: #fff;
+      background-color:  #58A1AD;
+    }
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background-color: #fff;
+      width: 0px;
+      height: 0px;
+      opacity: 0;
+      display: block;
+    }
+  }
+}

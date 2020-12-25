@@ -1,0 +1,13 @@
+@keyframes diffusion {
+  from {
+    opacity: .3;
+    width: 0px;
+    height: 0px;
+  }
+
+  to {
+    opacity: 0;
+    width: 150px;
+    height: 150px;
+  }
+}
