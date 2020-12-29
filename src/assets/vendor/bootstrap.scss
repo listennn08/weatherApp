@@ -1,8 +1,10 @@
+// nab-tabs
+
 .nav.nav-tabs {
   .nav-link{
     color: #000;
-    padding-left: 5.6rem;
-    padding-right: 5.6rem;
+    padding-left: 5.74rem;
+    padding-right: 5.74rem;
     border-bottom: 2px solid #58A1AD;
     position: relative;
     overflow: hidden;
@@ -34,5 +36,12 @@
       opacity: 0;
       display: block;
     }
+  }
+}
+
+// table
+.table.table-bordered {
+  th {
+    width: 10%;
   }
 }

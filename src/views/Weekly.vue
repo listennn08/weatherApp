@@ -1,6 +1,10 @@
 <template>
   <div class="container">
-    <ul class="nav nav-tabs">
+    <div class="w-25 float-end">
+      有效時間：{{ dateDuration[0] }} ~ {{ dateDuration[1] }}
+    </div>
+    <div class="clearfix"></div>
+    <ul class="nav nav-tabs mb-3">
       <li
         v-for="(_, area) in areas"
         :key="area"
@@ -21,18 +25,22 @@
       tag='table'
     >
       <table
-        class="table"
+        class="table table-bordered"
         :key="transition"
       >
         <thead>
-          <tr>
-            <th>縣市</th>
-            <th>時間</th>
+          <tr class="align-middle">
+            <th class="bg-primary text-white">縣市</th>
+            <th class="bg-primary text-white">時間</th>
             <th
-              v-for="t in time"
+              v-for="(t, index) in time.value"
               :key="t"
+              :class="time.isHoliday(t) ? 'bg-danger' : 'bg-primary'"
+              class="text-white"
             >
-              {{ t }}
+              {{ time.displayTime[index] }}
+              <br>
+              {{ time.getWeekDay(t) }}
             </th>
           </tr>
         </thead>
@@ -44,27 +52,40 @@
             <tr class="light align-middle">
               <td
                 rowspan="2"
+                class="bg-info text-white"
               >
                 {{ d.locationName }}
               </td>
-              <td>白天</td>
               <td
-                v-for="t in time"
+                class="bg-primary text-white"
+              >
+                白天
+              </td>
+              <td
+                v-for="t in time.value"
                 :key="t"
               >
                 {{ getInterval(t, d.PoP12h.time, 'm')?.elementValue?.[0].value.trim() || 0 }}%
                 <br>
                 <span v-if="getInterval(t, d.MinT.time, 'm')?.elementValue?.[0].value">
-                  {{ getInterval(t, d.MinT.time, 'm')?.elementValue?.[0].value }}°C -
-                  {{ getInterval(t, d.MaxT.time, 'm')?.elementValue?.[0].value }}°C
+                  {{
+                    tempartureConverter(getInterval(t, d.MinT.time, 'm')?.elementValue?.[0].value)
+                  }} -
+                  {{
+                    tempartureConverter(getInterval(t, d.MaxT.time, 'm')?.elementValue?.[0].value)
+                  }}
                 </span>
                 <span v-else></span>
               </td>
             </tr>
             <tr class="night align-middle">
-              <td>晚上</td>
               <td
-                v-for="t in time"
+                class="bg-primary text-white"
+              >
+                晚上
+              </td>
+              <td
+                v-for="t in time.value"
                 :key="t"
               >
                 {{ getInterval(t, d.PoP12h.time, 'n')?.elementValue?.[0].value.trim() || 0 }}%
@@ -90,7 +111,17 @@ import {
 import axios from 'axios';
 import { format } from 'date-fns';
 
-type Areas = {
+enum WeekDay {
+  '星期日',
+  '星期一',
+  '星期二',
+  '星期三',
+  '星期四',
+  '星期五',
+  '星期六',
+}
+
+type TAreas = {
   [name: string]: {
     includeCity: string[];
   };
@@ -140,10 +171,10 @@ type TWeatherData = {
   ];
 }
 
-const auth = 'CWB-B064CB6C-3660-4D60-A4B8-0988834FD02E';
+const auth = process.env.VUE_APP_SECRECT_KEY;
 const url = `https://opendata.cwb.gov.tw/api/v1/rest/datastore/F-D0047-091?Authorization=${auth}&elementName=MinT,MaxT,PoP12h`;
 
-const areas: Areas = {
+const areas: TAreas = {
   全部: {
     includeCity: [],
   },
@@ -167,31 +198,59 @@ const areas: Areas = {
 export default defineComponent({
   async setup() {
     const { data } = await axios.get(url);
-    const time = computed<string[]>(() => {
-      const { location } = data.records.locations[0];
-      return Array.from(
-        new Set(location[0].weatherElement[0].time.map((el: TWeatherData) => format(new Date(el.startTime), 'yyyy-MM-dd'))),
-      );
+    const time = reactive({
+      value: (() => Array.from(new Set<string>(data.records.locations[0].location[0]
+        .weatherElement[0]
+        .time.map((el: TWeatherData) => {
+          const dt = new Date(el.startTime);
+          return [dt.getFullYear(), dt.getMonth(), dt.getDate()];
+        })
+        .map(JSON.stringify)))
+        .map((el) => JSON.parse(el)))(),
+      displayTime: computed<string[]>(() => {
+        const { location } = data.records.locations[0];
+        return Array.from(
+          new Set(location[0].weatherElement[0].time.map((el: TWeatherData) => format(new Date(el.startTime), 'MM/dd'))),
+        );
+      }),
+      getWeekDay: (t: number[]) => WeekDay[new Date(t[0], t[1], t[2]).getDay()],
+      isHoliday: computed(() => (dt: number[]) => {
+        const [yyyy, mm, dd] = dt;
+        const d = new Date(yyyy, mm, dd).getDay();
+        return d === 0 || d === 6;
+      }),
     });
 
-    const weatherData: TWeatherItem[] = data.records.locations[0].location.map((el: TJSONData) => {
-      const [PoP12h, MinT, MaxT] = el.weatherElement;
-      return {
-        lat: el.lat,
-        locationName: el.locationName,
-        PoP12h,
-        MinT,
-        MaxT,
-      };
-    }).sort((a: TJSONData, b: TJSONData) => parseFloat(b.lat) - parseFloat(a.lat));
+    const dateDuration = (() => {
+      const [sY, sM, sD] = time.value[0];
+      const [eY, eM, eD] = time.value[time.value.length - 1];
+      return [
+        format(new Date(sY, sM, sD, 12, 0), 'MM/dd HH:ss'),
+        format(new Date(eY, eM, eD + 1, 6, 0), 'MM/dd HH:ss'),
+      ];
+    })();
+    const weatherData: TWeatherItem[] = data.records.locations[0].location
+      .map((el: TJSONData) => {
+        const [PoP12h, MinT, MaxT] = el.weatherElement;
+        return {
+          lat: el.lat,
+          locationName: el.locationName,
+          PoP12h,
+          MinT,
+          MaxT,
+        };
+      })
+      .sort((a: TJSONData, b: TJSONData) => parseFloat(b.lat) - parseFloat(a.lat));
     const transition = ref(false);
 
     const currentTab = reactive({
       value: '全部',
       isCurrentTab: computed(() => (tab: string) => (tab === currentTab.value)),
       changeTab: (tab: string) => {
-        currentTab.value = tab;
-        transition.value = !transition.value;
+        if (currentTab.value !== tab) {
+          currentTab.value = tab;
+          transition.value = !transition.value;
+        }
       },
     });
     const showData = computed(() => weatherData.filter((el) => {
@@ -200,17 +259,28 @@ export default defineComponent({
     }));
 
     const getInterval = computed(() => (
-      currentDate: string,
+      currentDate: number[],
       item: TWeatherData[],
       section: string,
     ) => item.filter((el) => {
-      const pivot = new Date(`${currentDate} 12:00:00`).getTime();
+      const [yyyy, mm, dd] = currentDate;
+      const pivot = new Date(yyyy, mm, dd, 12, 0, 0).getTime();
       const t = new Date(el.startTime).getTime();
-      return format(new Date(el.startTime), 'yyyy-MM-dd') === currentDate
+      return format(new Date(el.startTime), 'yyyy/MM/dd') === format(new Date(yyyy, mm, dd), 'yyyy/MM/dd')
         && (section === 'm'
           ? t - pivot < 0
           : t - pivot > 0);
     })[0]);
+
+    const tempartureConverter = (type: string, temp: number): string => {
+      if (temp || temp === 0) {
+        if (type === 'F') {
+          return `${temp * (9 / 5) + 32}°F`;
+        }
+        return `${temp}°C`;
+      }
+      return '';
+    };
 
     return {
       showData,
@@ -219,6 +289,8 @@ export default defineComponent({
       transition,
       time,
       getInterval,
+      dateDuration,
+      tempartureConverter,
     };
   },
 });
