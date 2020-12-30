@@ -6,7 +6,14 @@
     <router-link to="/weekly">Weekly</router-link> |
   </div>
   <Suspense>
-    <router-view/>
+    <template #default>
+      <router-view/>
+    </template>
+    <template #fallback>
+      <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </template>
   </Suspense>
 </template>
 
